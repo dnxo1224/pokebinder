@@ -1,0 +1,24 @@
+# PostgreSQL만 컨테이너로 실행한다. (Next.js 앱은 로컬에서 npm run dev)
+# 실행:  docker compose up -d      중지:  docker compose down
+# 데이터는 pgdata 볼륨에 영속화되므로 컨테이너를 지워도 살아남는다.
+services:
+  db:
+    image: postgres:17
+    container_name: pokedex-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: pokedex
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: devpw
+    ports:
+      - "5432:5432" # 내 PC의 5432 → 컨테이너의 5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d pokedex"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

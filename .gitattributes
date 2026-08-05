@@ -1,0 +1,8 @@
+# 줄바꿈 정규화: 저장소에는 LF로 보관하고 체크아웃 시 OS에 맞춤.
+# 다른 OS(mac/linux) PC에서 이어받아도 줄바꿈 diff가 튀지 않게 한다.
+* text=auto eol=lf
+
+# 배치/셸 스크립트는 각 OS 기본 줄바꿈 유지
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh  text eol=lf

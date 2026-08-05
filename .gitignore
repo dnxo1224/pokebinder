@@ -1,0 +1,26 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# env (실제 접속 정보 — 커밋 금지)
+.env
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+# claude code (로컬 전용 설정은 제외, launch.json은 공유)
+.claude/settings.local.json
+
+# IDE (IntelliJ) — 머신/유저 전용, 다른 PC와 공유하지 않음
+.idea/
+
+# misc
+.DS_Store
+npm-debug.log*
