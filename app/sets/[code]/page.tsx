@@ -11,7 +11,6 @@ interface CardRow {
   rarity: string | null;
   category: string;
   image_base: string | null;
-  variant_id: number | null;
 }
 
 // Next.js 15: params는 Promise
@@ -32,17 +31,9 @@ export default async function SetDetailPage({
     if (setRow[0]) setName = setRow[0].name;
 
     cards = await query<CardRow>(
-      `SELECT c.id, c.name, c.local_id, c.rarity, c.category, c.image_base,
-              v.id AS variant_id
+      `SELECT c.id, c.name, c.local_id, c.rarity, c.category, c.image_base
        FROM cards c
        JOIN sets s ON s.id = c.set_id
-       -- 대표 variant 1개를 붙인다: normal 우선, 없으면 가장 낮은 id
-       LEFT JOIN LATERAL (
-         SELECT id FROM card_variants cv
-         WHERE cv.card_id = c.id
-         ORDER BY (cv.variant_type <> 'normal'), cv.id
-         LIMIT 1
-       ) v ON true
        WHERE s.external_id = $1
        ORDER BY LPAD(regexp_replace(c.local_id, '\\D', '', 'g'), 6, '0'), c.local_id`,
       [code],
@@ -53,16 +44,20 @@ export default async function SetDetailPage({
 
   return (
     <>
-      <p className="muted">
-        <Link href="/sets">← 세트</Link>
-      </p>
-      <h1>{setName}</h1>
-      <p className="muted">
-        {code} · {cards.length}장 적재됨
-      </p>
+      <section className="hero-panel">
+        <p className="micro">
+          <Link href="/sets">← SETS</Link>
+        </p>
+        <h1 className="display-word sm">{setName}</h1>
+        <p className="hero-tagline">
+          {code} · {cards.length}장 적재됨
+        </p>
+      </section>
+
+      <div className="panel-head">CARDS</div>
 
       {cards.length === 0 ? (
-        <div className="notice">
+        <div className="info-box">
           이 세트에 적재된 카드가 없습니다. <code>npm run ingest -- --set {code}</code>{" "}
           를 실행하세요. (해당 세트의 언어에 맞춰 <code>--lang</code> 도 지정)
         </div>

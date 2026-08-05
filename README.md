@@ -1,7 +1,12 @@
-# 포켓몬 카드 도감 + 컬렉션 트래커
+# POKÉBINDER — 포켓몬 카드 도감 + 바인더 배치 시뮬레이터
 
-포켓몬 TCG 카드 도감과 개인 컬렉션(보유 수량) 관리 웹. 데이터는 [TCGdex](https://tcgdex.dev) 사용.
-설계 배경은 `../Downloads/pokemon-tcg-collection-tracker.md` 참조.
+실물 바인더를 채우기 전에 **어떤 카드를 어떻게 배치할지 미리 시뮬레이션**하는 웹.
+도감에서 카드를 골라 바인더에 넣어보고 배치를 확인한다. 데이터는 [TCGdex](https://tcgdex.dev) 사용.
+
+- 바인더는 개수 제한 없이 생성, 크기는 최대 **4×4**
+- 도감의 각 카드에서 "내 바인더에 추가" → 카드칸 위 스크롤 선택창으로 바인더 지정
+- 디자인: `../Downloads/DESIGN-nintendo-2001.md` (Nintendo.com 2001 "console chrome")
+- 데이터 설계 배경: `../Downloads/pokemon-tcg-collection-tracker.md`
 
 ## 스택
 
@@ -63,8 +68,10 @@ app/                     라우팅·페이지·API (폴더 = URL)
   page.tsx               홈 "/"
   sets/page.tsx          "/sets" 세트 목록
   sets/[code]/page.tsx   "/sets/sv03" 세트 상세(카드 그리드)
-  collection/page.tsx    "/collection" 보유 현황
-  api/collection/route.ts 수량 조회/저장 (POST/GET)
+  binders/page.tsx       "/binders" 바인더 생성/이름변경/크기변경/삭제 + 배치 미리보기
+  api/binders/route.ts   바인더 목록/생성
+  api/binders/[id]/route.ts        이름·크기 변경(PATCH), 삭제(DELETE)
+  api/binders/[id]/cards/route.ts  바인더에 카드 추가/빼기
 components/              CardTile(서버) · QuantityStepper(클라이언트)
 lib/                     db.ts(pg 풀) · tcgdex.ts(API 클라이언트)
 scripts/                 migrate.ts · ingest.ts

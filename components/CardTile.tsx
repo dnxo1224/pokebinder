@@ -1,6 +1,6 @@
 // 서버 컴포넌트. 카드 한 장을 렌더한다.
 // 이미지는 image_base(원본) + '/low.webp' 로 TCGdex CDN 핫링크. (§2-4)
-import QuantityStepper from "./QuantityStepper";
+import AddToBinder from "./AddToBinder";
 
 interface CardTileProps {
   card: {
@@ -10,7 +10,6 @@ interface CardTileProps {
     rarity: string | null;
     category: string;
     image_base: string | null;
-    variant_id: number | null;
   };
 }
 
@@ -31,9 +30,7 @@ export default function CardTile({ card }: CardTileProps) {
           {card.local_id}
           {card.rarity ? ` · ${card.rarity}` : ""}
         </div>
-        {card.variant_id != null && (
-          <QuantityStepper variantId={card.variant_id} />
-        )}
+        <AddToBinder cardId={card.id} />
       </div>
     </div>
   );

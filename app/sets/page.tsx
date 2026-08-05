@@ -36,8 +36,8 @@ export default async function SetsPage() {
   if (sets === null) {
     return (
       <>
-        <h1>세트</h1>
-        <div className="notice">
+        <div className="panel-head">SETS</div>
+        <div className="info-box">
           데이터베이스에 연결하지 못했습니다. <code>docker compose up -d</code> 로 DB를
           띄우고 <code>npm run db:migrate</code> 를 실행했는지 확인하세요.
         </div>
@@ -48,8 +48,8 @@ export default async function SetsPage() {
   if (sets.length === 0) {
     return (
       <>
-        <h1>세트</h1>
-        <div className="notice">
+        <div className="panel-head">SETS</div>
+        <div className="info-box">
           아직 적재된 세트가 없습니다. <code>npm run ingest -- --lang en --limit 3</code>{" "}
           으로 샘플 데이터를 넣어보세요.
         </div>
@@ -59,8 +59,7 @@ export default async function SetsPage() {
 
   return (
     <>
-      <h1>세트</h1>
-      <p className="muted">{sets.length}개 세트</p>
+      <div className="panel-head">SETS · {sets.length}개 세트</div>
       <ul className="set-list">
         {sets.map((s) => (
           <li key={`${s.lang}-${s.external_id}`}>
@@ -77,6 +76,7 @@ export default async function SetsPage() {
                 {s.ingested}/{s.card_count_total ?? "?"} 적재
                 {s.release_date ? ` · ${s.release_date}` : ""}
               </span>
+              <span className="arrow-chip">›</span>
             </Link>
           </li>
         ))}
