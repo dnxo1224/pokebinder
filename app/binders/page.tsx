@@ -58,12 +58,9 @@ export default async function BindersPage() {
 
   if (dbError) {
     return (
-      <>
-        <div className="panel-head">내 바인더</div>
-        <div className="panel">
-          <p>데이터베이스에 연결하지 못했습니다. DB가 실행 중인지 확인하세요.</p>
-        </div>
-      </>
+      <div className="info-box">
+        데이터베이스에 연결하지 못했습니다. DB가 실행 중인지 확인하세요.
+      </div>
     );
   }
 

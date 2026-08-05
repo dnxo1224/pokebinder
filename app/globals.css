@@ -48,9 +48,14 @@
 
 * { box-sizing: border-box; }
 
-html, body {
+html { height: 100%; }
+body {
   margin: 0;
   padding: 0;
+  min-height: 100vh;
+  /* 화면 전체를 채우는 세로 스택: 헤더 / 본문(신축) / 푸터(항상 맨 아래) */
+  display: flex;
+  flex-direction: column;
   background: var(--canvas);
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
@@ -77,7 +82,7 @@ a:hover { text-decoration: underline; }
   border-bottom: 2px solid var(--chrome-indigo);
 }
 .nav-bar {
-  max-width: 900px;
+  width: 100%;
   margin: 0 auto;
   min-height: 28px;
   display: flex;
@@ -114,9 +119,9 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--chrome-indigo);
 }
 .subnav-inner {
-  max-width: 900px;
+  width: 100%;
   margin: 0 auto;
-  padding: var(--xs) var(--sm);
+  padding: var(--xs) var(--lg);
   display: flex;
   gap: var(--md);
   font-size: 11px;
@@ -127,11 +132,14 @@ a:hover { text-decoration: underline; }
 }
 .subnav-inner span { color: var(--muted-indigo); }
 
-/* ── 본문 컨테이너 : 고정 캔버스 느낌 ─────────────────────────────── */
+/* ── 본문 컨테이너 : 화면 전체를 채운다 ───────────────────────────── */
 .container {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: var(--lg) var(--sm) var(--xxl);
+  flex: 1 1 auto;      /* 남는 세로 공간을 전부 차지 → 푸터가 맨 아래로 */
+  min-height: 0;       /* 자식이 넘칠 때 축소 가능하게 (스프레드 맞춤에 필수) */
+  width: 100%;
+  padding: var(--lg);
+  display: flex;
+  flex-direction: column;
 }
 
 /* 패널 헤더 바 (섹션 라벨) */
@@ -377,15 +385,17 @@ a:hover { text-decoration: underline; }
 }
 
 /* ── 바인더 관리 ───────────────────────────────────────────────────── */
-.binder-form {
+/* 페이지 전체를 세로로 채우고, 스프레드 영역만 신축시킨다 */
+.binder-page {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  gap: var(--sm);
-  flex-wrap: wrap;
+  flex-direction: column;
 }
-.binder-form .times { font-weight: 700; color: var(--ink-soft); }
-.binder-block { margin-top: var(--lg); }
-.binder-bar {
+
+/* 상단 툴바: 바인더 선택 탭 + 액션 */
+.binder-toolbar {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--sm);
@@ -395,31 +405,92 @@ a:hover { text-decoration: underline; }
   border-top: 1px solid rgba(255, 255, 255, 0.5);
   border-bottom: 2px solid var(--chrome-indigo);
 }
-.binder-name {
+.binder-tabs { display: flex; gap: var(--xs); flex-wrap: wrap; align-items: center; }
+/* 비활성 탭 = 무광 인디고, 활성 탭 = 밝은 플레이트 */
+.binder-tab {
+  font-family: Arial, sans-serif;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: var(--ink);
+  cursor: pointer;
+  padding: var(--xs) var(--sm);
+  min-height: 26px;
+  background: var(--muted-indigo);
+  color: var(--canvas-soft);
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 2px solid var(--chrome-indigo);
+  border-radius: var(--r-none);
 }
+.binder-tab:hover { background: var(--chrome-indigo); }
+.binder-tab.active {
+  background: var(--canvas-soft);
+  color: var(--ink);
+  border-bottom: 2px solid var(--surface);
+}
+.binder-actions { margin-left: auto; display: flex; gap: var(--xs); align-items: center; flex-wrap: wrap; }
 .binder-meta { font-size: 10px; color: var(--ink-soft); }
-.binder-actions { margin-left: auto; display: flex; gap: var(--xs); align-items: center; }
-
-/* 바인더 그리드 = 실제 바인더 페이지 */
-.binder-grid {
-  display: grid;
+.binder-form {
+  display: flex;
+  align-items: center;
   gap: var(--sm);
+  flex-wrap: wrap;
+}
+.binder-form .times { font-weight: 700; color: var(--ink-soft); }
+.create-panel { flex: none; margin-top: var(--sm); }
+
+/* ── 스프레드(양면) : 한 화면에 전부 보이도록 맞춘다 ───────────────── */
+.spread-fit {
+  flex: 1 1 auto;
+  min-height: 0;          /* ★ 넘치지 않고 줄어들 수 있게 */
+  display: grid;
+  place-items: center;
+  padding: var(--sm) 0;
+  overflow: hidden;       /* 어떤 경우에도 잘려나가 스크롤되지 않게 */
+  container-type: size;   /* ★ 아래 cqw/cqh 계산의 기준 상자 */
+}
+
+/* 좌우 페이지 + 가운데 링 바인딩.
+   카드 한 장의 폭을 '가로 제약'과 '세로 제약' 중 작은 쪽으로 직접 계산한다.
+   aspect-ratio를 페이지에 걸면 height:100%에 밀려 비율이 깨지므로 슬롯 크기를 직접 정한다. */
+/* --card-w 와 grid 트랙은 React가 인라인으로 넣는다.
+   (CSS의 repeat()와 calc() 나눗셈은 var()를 쓸 수 없어 파싱 단계에서 무효가 됨) */
+.spread {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.spread-page {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
   background: var(--periwinkle);
-  padding: var(--md);
+  border-top: 1px solid rgba(255, 255, 255, 0.5);
   border-bottom: 2px solid var(--chrome-indigo);
 }
+/* 가운데 바인더 링 */
+.spread-rings {
+  flex: none;
+  align-self: stretch;
+  width: 10px;
+  background: var(--carbon);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.35) 1.5px, transparent 1.5px);
+  background-size: 10px 22px;
+  border-left: 1px solid var(--chrome-indigo);
+  border-right: 1px solid var(--chrome-indigo);
+}
+
 .slot {
   position: relative;
-  aspect-ratio: 245 / 337;
+  min-width: 0;
+  min-height: 0;
   background: var(--canvas-soft);
   border-radius: var(--r-sm);
   display: grid;
   place-items: center;
+  overflow: hidden;
   /* 인셋(레벨 0): 위가 어둡고 아래가 밝다 */
   border-top: 2px solid var(--chrome-indigo);
   border-left: 1px solid var(--chrome-indigo);
@@ -427,23 +498,32 @@ a:hover { text-decoration: underline; }
   border-right: 1px solid rgba(255, 255, 255, 0.4);
 }
 .slot.filled { background: var(--surface); }
-.slot img { width: 100%; height: 100%; object-fit: contain; }
-.slot-empty { font-size: 10px; color: var(--muted-indigo); }
-.slot-noimg { font-size: 10px; color: var(--ink-soft); padding: var(--xs); text-align: center; }
+.slot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.slot-empty { font-size: clamp(8px, 1vw, 12px); color: var(--muted-indigo); }
+.slot-noimg {
+  font-size: clamp(7px, 0.8vw, 10px);
+  color: var(--ink-soft);
+  padding: var(--xxs);
+  text-align: center;
+  overflow: hidden;
+}
 .slot-remove {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 18px;
-  height: 18px;
+  top: 1px;
+  right: 1px;
+  width: clamp(14px, 1.6vw, 20px);
+  height: clamp(14px, 1.6vw, 20px);
   border-radius: var(--r-full);
   background: var(--primary);
   color: var(--on-primary);
   border: 1px solid var(--surface);
-  font-size: 11px;
+  font-size: clamp(9px, 1vw, 12px);
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
 }
 
 /* 빈 상태 */
@@ -498,10 +578,13 @@ a:hover { text-decoration: underline; }
   color: var(--canvas-soft);
   font-size: 10px;
   line-height: 1.3;
-  padding: var(--lg);
+  padding: var(--sm) var(--lg);
   border-top: 2px solid var(--chrome-indigo);
 }
-.site-footer .inner { max-width: 900px; margin: 0 auto; }
+.site-footer p { margin: var(--xxs) 0 0; }
+.esrb-badge { margin-bottom: 0 !important; }
+.site-footer { flex: none; }
+.site-footer .inner { width: 100%; margin: 0 auto; }
 .esrb-badge {
   display: inline-block;
   background: var(--amber);

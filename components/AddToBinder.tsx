@@ -94,7 +94,8 @@ export default function AddToBinder({ cardId }: { cardId: number }) {
               </div>
             ) : (
               binders.map((b) => {
-                const cap = b.grid_rows * b.grid_cols;
+                // 양면 스프레드: 좌우 2페이지
+                const cap = b.grid_rows * b.grid_cols * 2;
                 const full = b.card_count >= cap;
                 return (
                   <button

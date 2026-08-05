@@ -24,9 +24,9 @@ export async function POST(
   }
 
   try {
-    // 소유 확인 + 용량 확인
+    // 소유 확인 + 용량 확인 (양면 스프레드: 좌우 2페이지 = rows*cols*2)
     const b = await query<{ cap: number; used: number }>(
-      `SELECT (b.grid_rows * b.grid_cols) AS cap,
+      `SELECT (b.grid_rows * b.grid_cols * 2) AS cap,
               (SELECT COUNT(*)::int FROM binder_cards WHERE binder_id = b.id) AS used
        FROM binders b WHERE b.id = $1 AND b.user_id = $2`,
       [binderId, DEMO_USER_ID],
