@@ -1,5 +1,6 @@
-import Link from "next/link";
 import { query } from "@/lib/db";
+import SetBrowser, { type SetItem } from "@/components/SetBrowser";
+import { setArtFor } from "@/lib/setArt";
 
 export const dynamic = "force-dynamic"; // 항상 DB 최신값
 
@@ -8,7 +9,7 @@ interface SetRow {
   name: string;
   lang: string;
   release_date: string | null;
-  symbol_url: string | null;
+  logo_url: string | null;
   card_count_total: number | null;
   ingested: string; // count()는 문자열로 옴
 }
@@ -18,7 +19,7 @@ async function loadSets(): Promise<SetRow[] | null> {
     return await query<SetRow>(
       `SELECT s.external_id, s.name, s.lang,
               to_char(s.release_date, 'YYYY-MM-DD') AS release_date,
-              s.symbol_url, s.card_count_total, COUNT(c.id) AS ingested
+              s.logo_url, s.card_count_total, COUNT(c.id) AS ingested
        FROM sets s
        LEFT JOIN cards c ON c.set_id = s.id
        GROUP BY s.id
@@ -31,12 +32,14 @@ async function loadSets(): Promise<SetRow[] | null> {
 }
 
 export default async function SetsPage() {
-  const sets = await loadSets();
+  const rows = await loadSets();
 
-  if (sets === null) {
+  if (rows === null) {
     return (
       <>
-        <div className="panel-head">SETS</div>
+        <div className="section-head">
+          <h2>세트 도감</h2>
+        </div>
         <div className="info-box">
           데이터베이스에 연결하지 못했습니다. <code>docker compose up -d</code> 로 DB를
           띄우고 <code>npm run db:migrate</code> 를 실행했는지 확인하세요.
@@ -45,10 +48,12 @@ export default async function SetsPage() {
     );
   }
 
-  if (sets.length === 0) {
+  if (rows.length === 0) {
     return (
       <>
-        <div className="panel-head">SETS</div>
+        <div className="section-head">
+          <h2>세트 도감</h2>
+        </div>
         <div className="info-box">
           아직 적재된 세트가 없습니다. <code>npm run ingest -- --lang en --limit 3</code>{" "}
           으로 샘플 데이터를 넣어보세요.
@@ -57,30 +62,15 @@ export default async function SetsPage() {
     );
   }
 
-  return (
-    <>
-      <div className="panel-head">SETS · {sets.length}개 세트</div>
-      <ul className="set-list">
-        {sets.map((s) => (
-          <li key={`${s.lang}-${s.external_id}`}>
-            <Link href={`/sets/${s.external_id}`} className="set-row">
-              {s.symbol_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={`${s.symbol_url}.png`} alt="" />
-              ) : (
-                <span style={{ width: 34 }} />
-              )}
-              <span className="name">{s.name}</span>
-              <span className="badge">{s.lang}</span>
-              <span className="meta">
-                {s.ingested}/{s.card_count_total ?? "?"} 적재
-                {s.release_date ? ` · ${s.release_date}` : ""}
-              </span>
-              <span className="arrow-chip">›</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </>
-  );
+  const sets: SetItem[] = rows.map((s) => ({
+    externalId: s.external_id,
+    name: s.name,
+    lang: s.lang,
+    releaseDate: s.release_date,
+    artUrl: setArtFor(s.external_id, s.logo_url),
+    total: s.card_count_total,
+    ingested: Number(s.ingested),
+  }));
+
+  return <SetBrowser sets={sets} />;
 }

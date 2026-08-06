@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { query } from "@/lib/db";
 import CardTile from "@/components/CardTile";
+import { ImageIcon } from "@/components/Icons";
+import { setArtFor } from "@/lib/setArt";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +13,7 @@ interface CardRow {
   rarity: string | null;
   category: string;
   image_base: string | null;
+  types: string[] | null;
 }
 
 // Next.js 15: params는 Promise
@@ -23,15 +26,27 @@ export default async function SetDetailPage({
 
   let cards: CardRow[] = [];
   let setName = code;
+  let artUrl: string | null = null;
+  let releaseDate: string | null = null;
+
   try {
-    const setRow = await query<{ name: string }>(
-      `SELECT name FROM sets WHERE external_id = $1 LIMIT 1`,
+    const setRow = await query<{
+      name: string;
+      logo_url: string | null;
+      release_date: string | null;
+    }>(
+      `SELECT name, logo_url, to_char(release_date, 'YYYY-MM-DD') AS release_date
+       FROM sets WHERE external_id = $1 LIMIT 1`,
       [code],
     );
-    if (setRow[0]) setName = setRow[0].name;
+    if (setRow[0]) {
+      setName = setRow[0].name;
+      artUrl = setArtFor(code, setRow[0].logo_url);
+      releaseDate = setRow[0].release_date;
+    }
 
     cards = await query<CardRow>(
-      `SELECT c.id, c.name, c.local_id, c.rarity, c.category, c.image_base
+      `SELECT c.id, c.name, c.local_id, c.rarity, c.category, c.image_base, c.types
        FROM cards c
        JOIN sets s ON s.id = c.set_id
        WHERE s.external_id = $1
@@ -44,17 +59,31 @@ export default async function SetDetailPage({
 
   return (
     <>
-      <section className="hero-panel">
-        <p className="micro">
-          <Link href="/sets">← SETS</Link>
-        </p>
-        <h1 className="display-word sm">{setName}</h1>
-        <p className="hero-tagline">
-          {code} · {cards.length}장 적재됨
-        </p>
+      <section className="detail-head">
+        <div className="sym">
+          {artUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={artUrl} alt="" />
+          ) : (
+            <span style={{ color: "var(--muted)" }}><ImageIcon size={22} /></span>
+          )}
+        </div>
+        <div>
+          <Link href="/sets" className="back-link">
+            ← 세트 도감
+          </Link>
+          <h1>{setName}</h1>
+          <div className="sub">
+            {code} · {cards.length}장 적재됨
+            {releaseDate ? ` · ${releaseDate}` : ""}
+          </div>
+        </div>
       </section>
 
-      <div className="panel-head">CARDS</div>
+      <div className="section-head">
+        <h2>카드</h2>
+        <span className="count">{cards.length}장</span>
+      </div>
 
       {cards.length === 0 ? (
         <div className="info-box">
