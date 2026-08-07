@@ -486,6 +486,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 600;
 }
 .chip:disabled { background: var(--primary-disabled); color: var(--muted); cursor: default; }
+/* 성격이 다른 칩 묶음 사이 구분선 (예: 언어 | 정렬) */
+.chip-divider {
+  flex: none;
+  align-self: stretch;
+  width: 1px;
+  background: var(--hairline);
+  margin: 0 var(--xxs);
+}
 
 /* =====================================================================
    세트 카드 (md §feature-photo-card + §markets-table-card 어휘)

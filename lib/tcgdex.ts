@@ -40,7 +40,7 @@ export interface CardFull {
   rarity?: string;
   illustrator?: string;
   image?: string; // ★ 원본 그대로 저장
-  dexId?: number[];
+  dexId?: number[]; // 폼 변형은 소수(예: 384.1) — DB는 NUMERIC[]로 받는다
   hp?: number;
   types?: string[];
   stage?: string;
@@ -59,16 +59,39 @@ export interface CardFull {
   variants_detailed?: { type: string; variantId?: string }[];
 }
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`TCGdex ${res.status} on ${path}`);
-  return (await res.json()) as T;
+/** 대량 적재 중 일시적 네트워크 오류/5xx 는 흔하다. 지수 백오프로 몇 번 더 시도한다. */
+async function get<T>(path: string, attempts = 4): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(`${BASE}${path}`, {
+        headers: { accept: "application/json" },
+      });
+      if (!res.ok) {
+        // 429/5xx 는 재시도 가치가 있고, 4xx(경로 문제)는 재시도해도 소용없다
+        if (res.status === 429 || res.status >= 500) {
+          throw new Error(`TCGdex ${res.status} on ${path}`);
+        }
+        throw Object.assign(new Error(`TCGdex ${res.status} on ${path}`), { retryable: false });
+      }
+      return (await res.json()) as T;
+    } catch (e) {
+      lastErr = e;
+      if ((e as { retryable?: boolean }).retryable === false) break;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, 400 * 2 ** i));
+    }
+  }
+  throw lastErr;
 }
 
-export const getSets = (lang: string) => get<SetBrief[]>(`/${lang}/sets`);
+// 세트/카드 id 는 그대로 URL에 못 넣는다. 예: ja 세트 id 'SM1+' 의 '+' 는 raw 404,
+// en 카드 id 'exu-%3F' 는 TCGdex 가 '?' 문자를 아예 리터럴 '%3F' 문자열로 id에 박아둬서
+// (실제 문자 '?' 가 아니라 %,3,F 세 글자) 그대로 보내면 서버가 쿼리 구분자로 오인한다.
+// encodeURIComponent 로 감싸면 두 경우 다 정상 매칭된다.
+const seg = encodeURIComponent;
+
+export const getSets = (lang: string) => get<SetBrief[]>(`/${seg(lang)}/sets`);
 export const getSet = (lang: string, id: string) =>
-  get<SetDetail>(`/${lang}/sets/${id}`);
+  get<SetDetail>(`/${seg(lang)}/sets/${seg(id)}`);
 export const getCard = (lang: string, id: string) =>
-  get<CardFull>(`/${lang}/cards/${id}`);
+  get<CardFull>(`/${seg(lang)}/cards/${seg(id)}`);

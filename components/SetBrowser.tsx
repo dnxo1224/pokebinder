@@ -18,36 +18,46 @@ export interface SetItem {
 
 type SortKey = "recent" | "name" | "size";
 
-const ALL_YEARS = "all";
+const ALL = "all";
 
 export default function SetBrowser({ sets }: { sets: SetItem[] }) {
   const [q, setQ] = useState("");
-  const [year, setYear] = useState<string>(ALL_YEARS);
+  const [lang, setLang] = useState<string>(ALL);
+  const [year, setYear] = useState<string>(ALL);
   const [sort, setSort] = useState<SortKey>("recent");
 
-  // 발행 연도 목록 — 실제 데이터에 있는 연도만, 최신순
+  // 언어 목록 — 실제 데이터에 있는 언어만. ko 등이 추가되면 자동으로 나타난다.
+  const langs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of sets) counts.set(s.lang, (counts.get(s.lang) ?? 0) + 1);
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [sets]);
+
+  // 발행 연도 목록 — 선택된 언어 안에서만 센다.
+  // (JA만 보는데 EN에만 있는 연도가 목록에 남아 '0건'이 되는 걸 막는다)
   const years = useMemo(() => {
     const counts = new Map<string, number>();
     for (const s of sets) {
+      if (lang !== ALL && s.lang !== lang) continue;
       const y = s.releaseDate?.slice(0, 4);
       if (y) counts.set(y, (counts.get(y) ?? 0) + 1);
     }
     return [...counts.entries()].sort((a, b) => b[0].localeCompare(a[0]));
-  }, [sets]);
+  }, [sets, lang]);
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     let filtered = sets;
 
+    if (lang !== ALL) filtered = filtered.filter((s) => s.lang === lang);
     if (needle) {
       filtered = filtered.filter(
         (s) =>
           s.name.toLowerCase().includes(needle) ||
-          s.externalId.toLowerCase().includes(needle) ||
-          s.lang.toLowerCase() === needle,
+          s.externalId.toLowerCase().includes(needle),
       );
     }
-    if (year !== ALL_YEARS) {
+    if (year !== ALL) {
       filtered = filtered.filter((s) => s.releaseDate?.startsWith(year));
     }
 
@@ -60,9 +70,20 @@ export default function SetBrowser({ sets }: { sets: SetItem[] }) {
       sorted.sort((a, b) => (b.releaseDate ?? "").localeCompare(a.releaseDate ?? ""));
     }
     return sorted;
-  }, [sets, q, year, sort]);
+  }, [sets, q, lang, year, sort]);
 
-  const filtered = q.trim() !== "" || year !== ALL_YEARS;
+  const filtered = q.trim() !== "" || lang !== ALL || year !== ALL;
+
+  // 언어를 바꾸면 그 언어에 없는 연도가 선택돼 있을 수 있다 → 전체 연도로 되돌린다
+  function pickLang(next: string) {
+    setLang(next);
+    if (year !== ALL) {
+      const stillExists = sets.some(
+        (s) => (next === ALL || s.lang === next) && s.releaseDate?.startsWith(year),
+      );
+      if (!stillExists) setYear(ALL);
+    }
+  }
 
   return (
     <>
@@ -80,7 +101,7 @@ export default function SetBrowser({ sets }: { sets: SetItem[] }) {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="세트 이름이나 코드로 검색 (예: Base Set, base1, en)"
+            placeholder="세트 이름이나 코드로 검색 (예: Base Set, base1)"
             aria-label="세트 검색"
           />
           {q && (
@@ -96,7 +117,7 @@ export default function SetBrowser({ sets }: { sets: SetItem[] }) {
           onChange={(e) => setYear(e.target.value)}
           aria-label="발행 연도"
         >
-          <option value={ALL_YEARS}>전체 연도</option>
+          <option value={ALL}>전체 연도</option>
           {years.map(([y, n]) => (
             <option key={y} value={y}>
               {y}년 ({n})
@@ -105,7 +126,23 @@ export default function SetBrowser({ sets }: { sets: SetItem[] }) {
         </select>
       </div>
 
+      {/* 언어 · 정렬 — 성격이 다른 두 묶음이라 구분선으로 나눈다 */}
       <div className="chip-row">
+        <button className={`chip${lang === ALL ? " on" : ""}`} onClick={() => pickLang(ALL)}>
+          전체 언어
+        </button>
+        {langs.map(([code, n]) => (
+          <button
+            key={code}
+            className={`chip${lang === code ? " on" : ""}`}
+            onClick={() => pickLang(code)}
+          >
+            {code.toUpperCase()} ({n})
+          </button>
+        ))}
+
+        <span className="chip-divider" aria-hidden />
+
         <button className={`chip${sort === "recent" ? " on" : ""}`} onClick={() => setSort("recent")}>
           최신순
         </button>
