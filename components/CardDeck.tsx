@@ -108,7 +108,7 @@ export default function CardDeck({ cards }: { cards: DeckCard[] }) {
                 opacity: a > VISIBLE - 0.8 ? 0 : 1,
               }}
               onClick={() => {
-                if (isCenter) router.push(`/sets/${c.setCode}`);
+                if (isCenter) router.push(`/dex?cat=set&set=${encodeURIComponent(c.setCode)}`);
               }}
             >
               {c.imageBase ? (

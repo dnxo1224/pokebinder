@@ -51,15 +51,9 @@ export interface Category {
  */
 export const CATEGORIES: Category[] = [
   { id: "favorites", label: "즐겨찾기", desc: "찜해둔 카드를 모아 봅니다.", ready: true },
-  {
-    id: "set",
-    label: "카드 세트",
-    desc: "발매 세트별로 카드를 훑어봅니다.",
-    ready: false,
-    interimHref: "/sets",
-  },
-  { id: "dex", label: "포켓몬 도감번호", desc: "포켓몬 종별로 카드를 모아 봅니다.", ready: false },
-  { id: "artist", label: "아티스트", desc: "카드를 그린 일러스트레이터로 찾습니다.", ready: false },
+  { id: "set", label: "카드 세트", desc: "발매 세트별로 카드를 훑어봅니다.", ready: true },
+  { id: "dex", label: "포켓몬 도감번호", desc: "포켓몬 종별로 카드를 모아 봅니다.", ready: true },
+  { id: "artist", label: "아티스트", desc: "카드를 그린 일러스트레이터로 찾습니다.", ready: true },
   { id: "trainer", label: "트레이너", desc: "서포트·아이템·스타디움·도구.", ready: false },
   { id: "energy", label: "에너지", desc: "기본 에너지와 특수 에너지.", ready: false },
   { id: "etc", label: "etc", desc: "아직 분류되지 않은 카드입니다.", ready: false, temporary: true },
@@ -69,16 +63,42 @@ export function isCategory(v: string | undefined): v is CategoryId {
   return !!v && CATEGORIES.some((c) => c.id === v);
 }
 
+/**
+ * 대분류 안에서 하나를 고른 상태(3단)를 가리키는 쿼리 키.
+ * 대분류마다 키가 다르므로 여기서만 정의한다.
+ */
+export const PICK_KEY: Partial<Record<CategoryId, string>> = {
+  set: "set",
+  dex: "dex",
+  artist: "artist",
+};
+
+/**
+ * 카드 그리드 한 쪽에 담는 장수.
+ * 아티스트 한 명이 1,767장인 경우가 있어(5ban Graphics) 전부 한 번에 그리면
+ * HTML 이 5.7MB / 5초가 된다. 나눠서 보낸다.
+ */
+export const PAGE_SIZE = 120;
+
 /** 도감 링크를 한 곳에서 만든다. 쿼리 키가 흩어지지 않게. */
 export function dexHref(params: {
   lang?: LangValue;
   cat?: CategoryId | null;
+  /** 3단으로 들어갈 때의 값 (세트 코드 / 도감번호 / 아티스트명) */
+  pick?: string | null;
   q?: string | null;
+  /** 1-based. 1쪽은 쿼리에 남기지 않는다. */
+  page?: number | null;
 }): string {
   const sp = new URLSearchParams();
   if (params.lang && params.lang !== DEFAULT_LANG) sp.set("lang", params.lang);
   if (params.cat) sp.set("cat", params.cat);
+  if (params.cat && params.pick) {
+    const key = PICK_KEY[params.cat];
+    if (key) sp.set(key, params.pick);
+  }
   if (params.q) sp.set("q", params.q);
+  if (params.page && params.page > 1) sp.set("p", String(params.page));
   const s = sp.toString();
   return s ? `/dex?${s}` : "/dex";
 }

@@ -778,6 +778,83 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .cat-soon { font-size: 12px; font-weight: 500; color: var(--muted); }
 
+/* 카드 그리드 페이지 이동 */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--md);
+  margin-top: var(--xl);
+}
+.pager .btn[aria-disabled] { opacity: 0.4; cursor: default; pointer-events: none; }
+.pager-pos { color: var(--muted); font-size: 13px; }
+
+/* 포켓몬 종 목록 — 1,026종이라 타일을 작고 촘촘하게 */
+.species-grid {
+  display: grid;
+  gap: var(--xs);
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+}
+.species-tile {
+  display: flex;
+  align-items: center;
+  gap: var(--sm);
+  padding: var(--xs) var(--sm);
+  border-radius: var(--r-lg);
+  background: var(--surface-card);
+}
+.species-tile:hover { background: var(--surface-elevated); }
+.species-tile .thumb {
+  flex: none;
+  width: 36px;
+  height: 50px;
+  border-radius: var(--r-sm);
+  background: var(--canvas);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.species-tile .thumb img { width: 100%; height: 100%; object-fit: contain; }
+.species-tile .thumb .noimg { color: var(--muted); display: grid; place-items: center; }
+.species-tile .info { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.species-tile .dexno { font-size: 11px; color: var(--muted); }
+.species-tile .sname {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.species-tile .cnt { font-size: 11px; color: var(--muted); }
+
+/* 아티스트 목록 — 이미지가 없으니 이름과 장수만 */
+.artist-grid {
+  display: grid;
+  gap: var(--xs);
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+}
+.artist-tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sm);
+  padding: var(--sm) var(--md);
+  border-radius: var(--r-lg);
+  background: var(--surface-card);
+  border-left: 2px solid transparent;
+}
+.artist-tile:hover { background: var(--surface-elevated); border-left-color: var(--primary); }
+.artist-tile .aname {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--body);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.artist-tile .cnt { flex: none; font-size: 12px; color: var(--muted); }
+
 /* 즐겨찾기 토글 — 도감과 바인더를 잇는 유일한 접점 */
 .atb { margin-top: var(--xs); }
 .fav-btn {

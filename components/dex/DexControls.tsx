@@ -10,10 +10,13 @@ export default function DexControls({
   lang,
   cat,
   q,
+  pick,
 }: {
   lang: LangValue;
   cat: CategoryId | null;
   q: string;
+  /** 3단으로 들어간 상태인지 (세트 코드 / 도감번호 / 아티스트명) */
+  pick?: string | null;
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -24,10 +27,16 @@ export default function DexControls({
 
   function push(next: { lang?: LangValue; q?: string }) {
     const sp = new URLSearchParams(params.toString());
+    // 조건이 바뀌면 결과 수가 달라진다. 5쪽에 있다가 검색하면 빈 쪽이 나오므로 되돌린다.
+    sp.delete("p");
 
     if (next.lang !== undefined) {
       if (next.lang === DEFAULT_LANG) sp.delete("lang");
       else sp.set("lang", next.lang);
+      // 세트 코드는 언어마다 다르다(base1 은 EN 전용). 언어를 바꾸면 그 세트가
+      // 존재하지 않아 빈 화면이 되므로 목록으로 되돌린다.
+      // 도감번호·아티스트는 언어를 건너 유효하므로 그대로 둔다.
+      if (cat === "set") sp.delete("set");
     }
     if (next.q !== undefined) {
       if (next.q.trim()) sp.set("q", next.q.trim());
@@ -63,7 +72,11 @@ export default function DexControls({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={
-            cat ? "이 분류 안에서 카드·아티스트 검색" : "먼저 분류를 고르면 그 안에서 검색합니다"
+            !cat
+              ? "먼저 분류를 고르면 그 안에서 검색합니다"
+              : pick
+                ? "이 안에서 카드·아티스트 검색"
+                : "목록에서 검색"
           }
           aria-label="도감 검색"
           disabled={!cat}
