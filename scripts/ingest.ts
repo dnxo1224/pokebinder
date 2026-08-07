@@ -30,6 +30,12 @@ const ONLY_SET = arg("set"); // 특정 external_id만
 const MAX_CARDS = Number(arg("maxcards", "0")); // 세트당 카드 수 상한(0=무제한). 데모/속도용
 const CONCURRENCY = Math.max(1, Number(arg("concurrency", "10")));
 const FORCE = flag("force"); // 이미 있는 카드도 다시 받는다
+// 특정 카테고리만 골라 다시 받는다 (예: --refetch Trainer,Energy)
+// 새 컬럼을 추가한 뒤 전체를 다시 받지 않고 해당 카드만 채울 때 쓴다.
+const REFETCH = arg("refetch");
+const REFETCH_CATS = REFETCH
+  ? new Set(REFETCH.split(",").map((s) => s.trim()).filter(Boolean))
+  : null;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: CONCURRENCY + 2 });
 
@@ -85,9 +91,10 @@ async function upsertCard(setId: number, lang: string, c: CardFull): Promise<num
     `INSERT INTO cards (set_id, lang, external_id, local_id, name, category, rarity,
         illustrator, image_base, dex_ids, hp, types, stage, evolve_from, suffix,
         regulation_mark, retreat, abilities, attacks, weaknesses, resistances,
-        description, legal_standard, legal_expanded, source, external_source_id, updated_at)
+        description, legal_standard, legal_expanded, source, external_source_id, updated_at,
+        trainer_type, energy_type)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,
-        $18,$19,$20,$21,$22,$23,$24,'tcgdex',$25,$26)
+        $18,$19,$20,$21,$22,$23,$24,'tcgdex',$25,$26,$27,$28)
      ON CONFLICT (set_id, local_id) DO UPDATE SET
         name=EXCLUDED.name, category=EXCLUDED.category, rarity=EXCLUDED.rarity,
         illustrator=EXCLUDED.illustrator, image_base=EXCLUDED.image_base, dex_ids=EXCLUDED.dex_ids,
@@ -96,7 +103,8 @@ async function upsertCard(setId: number, lang: string, c: CardFull): Promise<num
         abilities=EXCLUDED.abilities, attacks=EXCLUDED.attacks, weaknesses=EXCLUDED.weaknesses,
         resistances=EXCLUDED.resistances, description=EXCLUDED.description,
         legal_standard=EXCLUDED.legal_standard, legal_expanded=EXCLUDED.legal_expanded,
-        updated_at=EXCLUDED.updated_at
+        updated_at=EXCLUDED.updated_at,
+        trainer_type=EXCLUDED.trainer_type, energy_type=EXCLUDED.energy_type
      RETURNING id`,
     [
       setId, lang, c.id, c.localId, c.name, c.category, c.rarity ?? null,
@@ -106,6 +114,7 @@ async function upsertCard(setId: number, lang: string, c: CardFull): Promise<num
       j(c.abilities), j(c.attacks), j(c.weaknesses), j(c.resistances),
       c.description ?? null, c.legal?.standard ?? null, c.legal?.expanded ?? null,
       c.id, c.updated ?? null,
+      c.trainerType ?? null, c.energyType ?? null,
     ],
   );
   return rows[0].id;
@@ -159,15 +168,29 @@ async function main() {
   // 이미 적재된 카드는 (external_id, local_id) 쌍으로 한 번에 조회해 건너뛴다.
   // 크래시 후 재실행해도 처음부터 다시 받지 않도록 하는 핵심 장치.
   const already = new Set<string>();
+  // --refetch 대상 카드의 키. 카테고리는 DB에만 있고 세트 목록(brief)에는 없어서
+  // 여기서 미리 만들어 둔다.
+  const refetchKeys = new Set<string>();
   if (!FORCE) {
-    const { rows } = await pool.query<{ set_ext: string; local_id: string }>(
-      `SELECT s.external_id AS set_ext, c.local_id
+    const { rows } = await pool.query<{ set_ext: string; local_id: string; category: string }>(
+      `SELECT s.external_id AS set_ext, c.local_id, c.category
          FROM cards c JOIN sets s ON s.id = c.set_id
         WHERE c.lang = $1`,
       [LANG],
     );
-    for (const r of rows) already.add(`${r.set_ext}|${r.local_id}`);
-    if (already.size > 0) console.log(`↺ 이미 적재된 카드 ${already.size}장은 건너뜁니다 (--force 로 무시 가능)`);
+    for (const r of rows) {
+      const key = `${r.set_ext}|${r.local_id}`;
+      if (REFETCH_CATS?.has(r.category)) {
+        refetchKeys.add(key); // 다시 받을 대상이므로 건너뛰기 목록에 넣지 않는다
+      } else {
+        already.add(key);
+      }
+    }
+    if (REFETCH_CATS) {
+      console.log(`↻ ${[...REFETCH_CATS].join("/")} ${refetchKeys.size}장만 다시 받습니다`);
+    } else if (already.size > 0) {
+      console.log(`↺ 이미 적재된 카드 ${already.size}장은 건너뜁니다 (--force 로 무시 가능)`);
+    }
   }
 
   // 1단계: 세트 메타 + 카드 목록 확보. 세트 요청은 적으므로 순차로 충분하다.
@@ -182,7 +205,11 @@ async function main() {
       const briefs = MAX_CARDS > 0 ? detail.cards.slice(0, MAX_CARDS) : detail.cards;
       let queued = 0;
       for (const b of briefs) {
-        if (!FORCE && already.has(`${s.id}|${b.localId}`)) continue;
+        const key = `${s.id}|${b.localId}`;
+        if (!FORCE && already.has(key)) continue;
+        // --refetch 가 걸리면 그 카테고리에 속한 '기존' 카드만 대상으로 삼는다.
+        // (신규 카드는 카테고리를 알 수 없으니 이 모드에서는 건드리지 않는다)
+        if (REFETCH_CATS && !refetchKeys.has(key)) continue;
         queue.push({ setId, setExtId: s.id, localId: b.localId, cardId: b.id });
         queued++;
       }

@@ -37,6 +37,10 @@ export interface CardFull {
   localId: string;
   name: string;
   category: "Pokemon" | "Trainer" | "Energy";
+  /** Item | Supporter | Stadium | Tool. 2003년 이전 카드에는 없다(= '클래식') */
+  trainerType?: string;
+  /** Normal | Special */
+  energyType?: string;
   rarity?: string;
   illustrator?: string;
   image?: string; // ★ 원본 그대로 저장
