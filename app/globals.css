@@ -722,9 +722,95 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn-sm { height: 32px; padding: 0 var(--md); }
 .btn-block { width: 100%; }
 
-/* 보관함 담기 버튼 자리.
-   결과는 버튼 라벨로 알린다 — 타일이 overflow:hidden 이라 바깥에 띄우면 잘린다. */
+/* =====================================================================
+   도감 (ADR-0001)
+   ===================================================================== */
+.dex-controls { display: flex; flex-direction: column; gap: var(--sm); }
+.dex-controls .chip-row { margin-top: 0; }
+.dex-controls .searchbar input:disabled { cursor: default; }
+
+.dex-hint {
+  margin: var(--lg) 0 var(--md);
+  font-size: 14px;
+  color: var(--muted-strong);
+}
+
+/* 대분류 타일 — 즐겨찾기가 첫 자리 */
+.cat-grid {
+  display: grid;
+  gap: var(--md);
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+}
+.cat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--xxs);
+  padding: var(--md);
+  border-radius: var(--r-xl);
+  background: var(--surface-card);
+}
+.cat-tile:hover { background: var(--surface-elevated); }
+.cat-tile.is-disabled { opacity: 0.5; cursor: default; }
+.cat-tile.is-disabled:hover { background: var(--surface-card); }
+.cat-name {
+  display: flex;
+  align-items: center;
+  gap: var(--xs);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--on-dark);
+}
+.cat-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+}
+.cat-desc { font-size: 13px; color: var(--muted-strong); }
+.cat-foot {
+  margin-top: var(--xs);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--primary);
+}
+.cat-soon { font-size: 12px; font-weight: 500; color: var(--muted); }
+
+/* 즐겨찾기 토글 — 도감과 바인더를 잇는 유일한 접점 */
 .atb { margin-top: var(--xs); }
+.fav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--xs);
+  width: 100%;
+  height: 32px;
+  margin-top: var(--xs);
+  padding: 0 var(--md);
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: var(--surface-card);
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.fav-btn:hover:not(:disabled) { background: var(--surface-elevated); color: var(--on-dark); }
+.fav-btn.on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--on-primary);
+}
+.fav-btn:disabled { opacity: 0.6; cursor: default; }
+.fav-btn.icon-only {
+  width: 32px;
+  padding: 0;
+  margin-top: 0;
+  border-radius: var(--r-pill);
+}
 
 /* =====================================================================
    바인더

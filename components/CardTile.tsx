@@ -1,7 +1,7 @@
 // 서버 컴포넌트. 카드 한 장을 렌더한다.
 // 이미지는 image_base(원본) + '/low.webp' 로 TCGdex CDN 핫링크. (§2-4)
 // 타입 색은 이미지 뒤 광원으로만 쓴다 — 카드 아트 자체는 건드리지 않는다.
-import AddToStorage from "./AddToStorage";
+import FavoriteButton from "./FavoriteButton";
 import { auraFor, isRare } from "@/lib/cardStyle";
 
 interface CardTileProps {
@@ -14,9 +14,11 @@ interface CardTileProps {
     image_base: string | null;
     types: string[] | null;
   };
+  /** 이미 찜한 카드인지. 부모가 한 번에 조회해 내려준다. */
+  favorited?: boolean;
 }
 
-export default function CardTile({ card }: CardTileProps) {
+export default function CardTile({ card, favorited = false }: CardTileProps) {
   const aura = auraFor(card.types, card.category);
   const rare = isRare(card.rarity);
 
@@ -51,7 +53,7 @@ export default function CardTile({ card }: CardTileProps) {
           {card.name}
         </div>
         <div className="cmeta">{card.category}</div>
-        <AddToStorage cardId={card.id} />
+        <FavoriteButton cardId={card.id} initial={favorited} />
       </div>
     </div>
   );

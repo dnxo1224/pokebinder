@@ -75,24 +75,17 @@ export default async function HomePage() {
 
       <CardDeck cards={cards} />
 
-      {/* 메인 액션 3종 */}
+      {/* 메인 액션 2종 (ADR-0001 — 도감 / 바인더 제작) */}
       <div className="actions-3">
-        <Link href="/search" className="action-card">
-          <span className="soon">준비 중</span>
-          <h3>카드 검색</h3>
-          <p>이름·타입·레어도로 카드를 찾습니다.</p>
-          <span className="go">열기 →</span>
-        </Link>
-
-        <Link href="/sets" className="action-card">
-          <h3>세트 도감</h3>
-          <p>세트별 카드 목록을 열고 바인더에 담습니다.</p>
+        <Link href="/dex" className="action-card">
+          <h3>도감</h3>
+          <p>세트·포켓몬·아티스트 등으로 카드를 찾고 즐겨찾기에 담습니다.</p>
           <span className="go">열기 →</span>
         </Link>
 
         <Link href="/binders" className="action-card">
-          <h3>바인더</h3>
-          <p>바인더를 만들고 크기를 정하고 배치를 확인합니다.</p>
+          <h3>바인더 제작</h3>
+          <p>바인더를 만들고 카드를 배치해 실물 배치를 미리 봅니다.</p>
           <span className="go">열기 →</span>
         </Link>
       </div>

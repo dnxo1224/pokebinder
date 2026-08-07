@@ -10,6 +10,20 @@ export function SearchIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+export function StarIcon({ size = 16, filled = false }: { size?: number; filled?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path
+        d="M10 2.6l2.3 4.66 5.15.75-3.73 3.63.88 5.13L10 14.35l-4.6 2.42.88-5.13L2.55 8.01l5.15-.75L10 2.6z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        fill={filled ? "currentColor" : "none"}
+      />
+    </svg>
+  );
+}
+
 export function PlusIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" fill="none" aria-hidden>

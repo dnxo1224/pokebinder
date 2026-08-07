@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// ADR-0001 — 서비스는 도감/바인더 제작 두 축이다.
 const ITEMS = [
-  { href: "/search", label: "카드 검색" },
-  { href: "/sets", label: "세트 도감" },
-  { href: "/binders", label: "바인더" },
+  { href: "/dex", label: "도감" },
+  { href: "/binders", label: "바인더 제작" },
 ];
 
 export default function NavLinks() {
