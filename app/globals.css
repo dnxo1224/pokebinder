@@ -1066,6 +1066,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
    카드 보관함 사이드바 — 편집 모드에서만 열린다
    ===================================================================== */
 .storage-rail {
+  position: relative; /* 빼기 구역(.rail-dropzone)이 이 안을 덮는다 */
   flex: none;
   width: 0;
   min-height: 0;
@@ -1085,14 +1086,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
   pointer-events: auto;
 }
 .storage-rail.over { outline: 1px solid var(--primary); outline-offset: -1px; }
-/* 접혀도 내부 폭은 268px 로 유지한다. 이게 없으면 width:0 일 때 글자가 한 글자씩
-   세로로 접히면서 min-content 높이가 폭발해 페이지 전체를 밀어낸다. */
+/* 내부를 절대 배치로 흐름에서 빼낸다. 두 가지를 동시에 막는다.
+   ① 검색 결과가 길어지면 그 높이가 flex row 의 교차축을 밀어올려
+      사이드바가 무대 높이를 결정해 버린다 (끝없이 늘어남).
+   ② 접혔을 때(width:0) 글자가 한 글자씩 세로로 접히며 높이가 폭발한다.
+   흐름에서 빠지면 무대 높이는 화면에서 내려오고, 목록은 그 안에서 스크롤된다. */
 .rail-inner {
+  position: absolute;
+  inset: 0;
   width: 268px;
-  height: 100%;
-  min-height: 0;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .rail-head {
@@ -1153,35 +1158,221 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-size: 11px;
   color: var(--muted);
 }
-.rail-empty {
-  flex: none;
-  margin: 0;
+.rail-note {
   padding: var(--md);
   font-size: 12px;
   line-height: 1.5;
   color: var(--muted);
 }
-.rail-empty b { color: var(--body); }
 
-/* 버리기 존 — 보관함 카드를 끌어다 놓으면 삭제 */
-.rail-trash {
+/* 사이드바 검색 */
+.rail-search {
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: var(--xs);
-  padding: var(--sm) var(--md);
-  border-top: 1px solid var(--hairline);
+  margin: var(--sm) var(--sm) 0;
+  padding: 0 var(--sm);
+  height: 34px;
+  border-radius: var(--r-md);
+  background: var(--surface-elevated);
+}
+.rail-search .ico { color: var(--muted); flex: none; }
+.rail-search input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: var(--on-dark);
+}
+.rail-filters {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--xxs);
+  padding: var(--xs) var(--sm) 0;
+}
+.rail-filters .chip { height: 26px; padding: 0 var(--xs); font-size: 12px; }
+.rail-set { height: 30px; width: 100%; font-size: 12px; }
+
+/* 검색 결과 한 줄 */
+.rail-thumb {
+  flex: none;
+  width: 26px;
+  height: 36px;
+  border-radius: var(--r-xs);
+  background: var(--canvas);
+  overflow: hidden;
+}
+.rail-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.rail-text { display: flex; flex-direction: column; min-width: 0; }
+.rail-fav { color: var(--primary); margin-right: 3px; }
+.rail-set-name {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 빼기 구역 — 칸에서 카드를 끌면 사이드바 전체를 덮는다 */
+.rail-dropzone {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sm);
+  padding: var(--md);
+  text-align: center;
+  border-radius: var(--r-xl);
+  border: 2px dashed var(--muted);
+  background: rgba(11, 14, 17, 0.88);
+  box-shadow: inset 0 0 0 100vmax rgba(0, 0, 0, 0.35);
+  color: var(--muted-strong);
   font-size: 12px;
   font-weight: 500;
-  color: var(--muted);
-  transition: background 140ms ease, color 140ms ease;
 }
-.rail-trash.over {
-  background: var(--danger);
+.rail-dropzone.over {
+  border-color: var(--danger);
+  border-style: solid;
+  background: rgba(224, 72, 92, 0.16);
   color: #fff;
-  font-weight: 600;
 }
+
+/* 빼기 되돌리기 */
+.undo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--lg);
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: var(--md);
+  padding: var(--sm) var(--md);
+  border-radius: var(--r-lg);
+  background: var(--surface-elevated);
+  border: 1px solid var(--hairline);
+  font-size: 13px;
+}
+
+/* =====================================================================
+   바인더 목록
+   ===================================================================== */
+.binder-grid {
+  display: grid;
+  gap: var(--md);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.binder-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-xl);
+  background: var(--surface-card);
+  overflow: hidden;
+}
+.binder-card:hover { background: var(--surface-elevated); }
+.binder-card .cover {
+  aspect-ratio: 16 / 10;
+  background: var(--surface-elevated);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.binder-card:hover .cover { background: var(--canvas); }
+.binder-card .cover img { max-width: 70%; max-height: 70%; object-fit: contain; }
+.binder-card .cover .noimg { color: var(--muted); }
+.binder-card .body { padding: var(--md); display: flex; flex-direction: column; gap: var(--xxs); }
+.binder-card .bname { font-size: 16px; font-weight: 600; color: var(--on-dark); }
+.binder-card .bmeta { font-size: 12px; color: var(--muted); }
+.binder-card .fill {
+  height: 3px;
+  margin: var(--xxs) 0;
+  border-radius: var(--r-xs);
+  background: var(--surface-elevated);
+  overflow: hidden;
+}
+.binder-card:hover .fill { background: var(--canvas); }
+.binder-card .fill > i { display: block; height: 100%; background: var(--primary); }
+
+.binder-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--on-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =====================================================================
+   모달 (커버 고르기)
+   ===================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: grid;
+  place-items: center;
+  padding: var(--lg);
+  background: rgba(0, 0, 0, 0.6);
+}
+.modal {
+  width: min(880px, 100%);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-xl);
+  background: var(--surface-card);
+  border: 1px solid var(--hairline);
+  overflow: hidden;
+}
+.modal-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--md);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--on-dark);
+}
+.cover-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--xs);
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  padding: var(--md);
+}
+.cover-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--xxs);
+  padding: var(--xs);
+  border-radius: var(--r-lg);
+  border: 1px solid transparent;
+  background: var(--surface-elevated);
+  cursor: pointer;
+  color: var(--muted-strong);
+  font-size: 11px;
+}
+.cover-opt img { width: 100%; height: 56px; object-fit: contain; }
+.cover-opt span {
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+}
+.cover-opt:hover { background: var(--canvas); color: var(--on-dark); }
+.cover-opt.on { border-color: var(--primary); color: var(--primary); }
 
 /* 호버 시 카드 이미지 미리보기 — 사이드바 오른쪽에 뜬다 */
 /* top/left 는 JS가 레일 위치에서 계산해 인라인으로 넣는다 */

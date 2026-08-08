@@ -10,7 +10,8 @@ import { query, withTx } from "@/lib/db";
 import type { PoolClient } from "pg";
 
 const DEMO_USER_ID = 1; // TODO: auth
-const MAX_PAGES = 20;
+// 마이그레이션 006 의 CHECK(1~60), components/BinderEditor.tsx 의 MAX_PAGES 와 맞출 것
+const MAX_PAGES = 60;
 
 interface BinderRow {
   grid_rows: number;
@@ -123,18 +124,14 @@ export async function DELETE(
 
   try {
     const moved = await withTx(async (c) => {
-      // 이 페이지에 있던 카드는 버리지 않고 보관함으로 되돌린다
+      // 이 페이지에 있던 카드는 배치가 사라진다. 보관함이 폐기됐으므로
+      // 되돌릴 곳이 없다 — 클라이언트가 삭제 전에 확인창으로 알린다.
       const res = await c.query<{ card_id: number }>(
         `SELECT card_id FROM binder_cards
           WHERE binder_id = $1 AND position >= $2 AND position < $3 FOR UPDATE`,
         [binderId, start, end],
       );
       if (res.rowCount) {
-        await c.query(
-          `INSERT INTO card_storage (user_id, card_id)
-           SELECT $1, unnest($2::bigint[])`,
-          [DEMO_USER_ID, res.rows.map((r) => r.card_id)],
-        );
         await c.query(
           `DELETE FROM binder_cards
             WHERE binder_id = $1 AND position >= $2 AND position < $3`,
@@ -152,7 +149,7 @@ export async function DELETE(
 
     return NextResponse.json({
       ok: true,
-      returnedToStorage: moved,
+      removedCards: moved,
       pageCount: binder.page_count - 1,
     });
   } catch (e) {

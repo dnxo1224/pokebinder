@@ -1,5 +1,5 @@
-// 개별 바인더: 이름변경/크기변경, 삭제
-// PATCH  /api/binders/3  { name?, rows?, cols? }
+// 개별 바인더: 이름변경/크기변경/커버지정, 삭제
+// PATCH  /api/binders/3  { name?, rows?, cols?, coverSetId? }   coverSetId: null 이면 기본 커버
 // DELETE /api/binders/3
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
@@ -16,7 +16,7 @@ export async function PATCH(
     return NextResponse.json({ error: "bad id" }, { status: 400 });
   }
 
-  let body: { name?: string; rows?: number; cols?: number };
+  let body: { name?: string; rows?: number; cols?: number; coverSetId?: number | null };
   try {
     body = await req.json();
   } catch {
@@ -44,6 +44,18 @@ export async function PATCH(
       return NextResponse.json({ error: "열은 1~4만 가능합니다" }, { status: 400 });
     vals.push(c);
     sets.push(`grid_cols = $${vals.length}`);
+  }
+  // null 을 명시적으로 보내면 기본 커버(Base Set)로 되돌린다
+  if (body.coverSetId !== undefined) {
+    if (body.coverSetId === null) {
+      sets.push(`cover_set_id = NULL`);
+    } else {
+      const s = Number(body.coverSetId);
+      if (!Number.isInteger(s))
+        return NextResponse.json({ error: "coverSetId 가 올바르지 않습니다" }, { status: 400 });
+      vals.push(s);
+      sets.push(`cover_set_id = $${vals.length}`);
+    }
   }
   if (sets.length === 0) {
     return NextResponse.json({ error: "변경할 내용이 없습니다" }, { status: 400 });

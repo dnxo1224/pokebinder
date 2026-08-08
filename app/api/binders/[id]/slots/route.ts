@@ -1,11 +1,13 @@
-// 바인더 칸 배치 — 보관함↔바인더, 칸↔칸 이동
+// 바인더 칸 배치 (ADR-0001)
 //
 // POST /api/binders/3/slots
-//   { action: 'place',   storageId, position }  보관함 → 칸
-//   { action: 'unplace', position }             칸 → 보관함
-//   { action: 'move',    from, to }             칸 → 칸 (대상이 차 있으면 자리 교환)
+//   { action: 'place',   cardId, position }   카드를 칸에 놓는다 (사이드바 검색 → 드래그)
+//   { action: 'remove',  position }           칸을 비운다 (되돌리려면 place 를 다시 부른다)
+//   { action: 'move',    from, to }           칸 → 칸 (대상이 차 있으면 자리 교환)
 //
-// 두 테이블을 함께 바꾸므로 전부 트랜잭션 안에서 처리한다.
+// 보관함이 폐기되면서 'place' 의 출처가 보관함 항목이 아니라 카드 자체가 됐고,
+// 'unplace'(보관함으로 되돌리기)는 'remove'(그냥 비우기)로 바뀌었다.
+// 같은 카드를 여러 칸에 넣을 수 있다 — 검색 목록에서 여러 번 끌어다 놓으면 된다.
 import { NextResponse } from "next/server";
 import { query, withTx } from "@/lib/db";
 
@@ -16,7 +18,7 @@ const TEMP_POSITION = -1;
 
 interface Body {
   action?: string;
-  storageId?: number;
+  cardId?: number;
   position?: number;
   from?: number;
   to?: number;
@@ -53,60 +55,53 @@ export async function POST(
 
   try {
     switch (body.action) {
-      // ── 보관함 → 칸 ─────────────────────────────────────────────────
+      // ── 카드 → 칸 ───────────────────────────────────────────────────
       case "place": {
-        const storageId = Number(body.storageId);
+        const cardId = Number(body.cardId);
         const position = Number(body.position);
-        if (!Number.isInteger(storageId) || !inRange(position)) {
-          return NextResponse.json({ error: "storageId, position 필요" }, { status: 400 });
+        if (!Number.isInteger(cardId) || !inRange(position)) {
+          return NextResponse.json({ error: "cardId, position 필요" }, { status: 400 });
         }
 
         await withTx(async (c) => {
-          // 보관함 항목을 잠그고 꺼낸다 (동시에 두 칸에 넣는 것 방지)
-          const st = await c.query<{ card_id: number }>(
-            `SELECT card_id FROM card_storage
-              WHERE id = $1 AND user_id = $2 FOR UPDATE`,
-            [storageId, DEMO_USER_ID],
-          );
-          if (st.rowCount === 0) throw new Error("보관함에 없는 카드입니다");
+          const exists = await c.query(`SELECT 1 FROM cards WHERE id = $1`, [cardId]);
+          if (exists.rowCount === 0) throw new Error("없는 카드입니다");
 
           const occupied = await c.query(
-            `SELECT 1 FROM binder_cards WHERE binder_id = $1 AND position = $2`,
+            `SELECT 1 FROM binder_cards WHERE binder_id = $1 AND position = $2 FOR UPDATE`,
             [binderId, position],
           );
           if (occupied.rowCount) throw new Error("이미 카드가 있는 칸입니다");
 
           await c.query(
             `INSERT INTO binder_cards (binder_id, card_id, position) VALUES ($1,$2,$3)`,
-            [binderId, st.rows[0].card_id, position],
+            [binderId, cardId, position],
           );
-          await c.query(`DELETE FROM card_storage WHERE id = $1`, [storageId]);
         });
         break;
       }
 
-      // ── 칸 → 보관함 ─────────────────────────────────────────────────
-      case "unplace": {
+      // ── 칸 비우기 ───────────────────────────────────────────────────
+      // 되돌리기는 클라이언트가 place 를 다시 부르는 것으로 처리한다.
+      // 그래서 어떤 카드였는지 응답으로 돌려준다.
+      case "remove": {
         const position = Number(body.position);
         if (!inRange(position)) {
           return NextResponse.json({ error: "position 필요" }, { status: 400 });
         }
 
-        await withTx(async (c) => {
+        const removed = await withTx(async (c) => {
           const bc = await c.query<{ id: number; card_id: number }>(
             `SELECT id, card_id FROM binder_cards
               WHERE binder_id = $1 AND position = $2 FOR UPDATE`,
             [binderId, position],
           );
           if (bc.rowCount === 0) throw new Error("빈 칸입니다");
-
-          await c.query(`INSERT INTO card_storage (user_id, card_id) VALUES ($1,$2)`, [
-            DEMO_USER_ID,
-            bc.rows[0].card_id,
-          ]);
           await c.query(`DELETE FROM binder_cards WHERE id = $1`, [bc.rows[0].id]);
+          return bc.rows[0].card_id;
         });
-        break;
+
+        return NextResponse.json({ ok: true, removedCardId: removed, position: Number(body.position) });
       }
 
       // ── 칸 → 칸 (대상이 차 있으면 교환) ────────────────────────────
@@ -133,24 +128,12 @@ export async function POST(
           );
 
           if (dst.rowCount === 0) {
-            await c.query(`UPDATE binder_cards SET position = $1 WHERE id = $2`, [
-              to,
-              src.rows[0].id,
-            ]);
+            await c.query(`UPDATE binder_cards SET position = $1 WHERE id = $2`, [to, src.rows[0].id]);
           } else {
             // 유일 제약 때문에 한 쪽을 임시 자리로 피신시킨 뒤 교환한다
-            await c.query(`UPDATE binder_cards SET position = $1 WHERE id = $2`, [
-              TEMP_POSITION,
-              src.rows[0].id,
-            ]);
-            await c.query(`UPDATE binder_cards SET position = $1 WHERE id = $2`, [
-              from,
-              dst.rows[0].id,
-            ]);
-            await c.query(`UPDATE binder_cards SET position = $1 WHERE id = $2`, [
-              to,
-              src.rows[0].id,
-            ]);
+            await c.query(`UPDATE binder_cards SET position = $1 WHERE id = $2`, [TEMP_POSITION, src.rows[0].id]);
+            await c.query(`UPDATE binder_cards SET position = $1 WHERE id = $2`, [from, dst.rows[0].id]);
+            await c.query(`UPDATE binder_cards SET position = $1 WHERE id = $2`, [to, src.rows[0].id]);
           }
         });
         break;

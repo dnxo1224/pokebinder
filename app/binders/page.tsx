@@ -1,16 +1,16 @@
 import { query } from "@/lib/db";
-import BinderManager, {
-  type BinderData,
-  type StorageCard,
-} from "@/components/BinderManager";
+import BinderList, { type BinderSummary } from "@/components/BinderList";
 
 export const dynamic = "force-dynamic";
 
 const DEMO_USER_ID = 1; // TODO: auth
 
+/** 커버를 지정하지 않은 바인더의 기본 이미지 (ADR-0001) */
+const DEFAULT_COVER_SET = "base1";
+
 export default async function BindersPage() {
-  let binders: BinderData[] = [];
-  let storage: StorageCard[] = [];
+  let binders: BinderSummary[] = [];
+  let defaultCover: string | null = null;
   let dbError = false;
 
   try {
@@ -20,74 +20,36 @@ export default async function BindersPage() {
       grid_rows: number;
       grid_cols: number;
       page_count: number;
+      placed: string;
+      cover_logo: string | null;
     }>(
-      `SELECT id, name, grid_rows, grid_cols, page_count
-       FROM binders WHERE user_id = $1 ORDER BY created_at`,
-      [DEMO_USER_ID],
-    );
-
-    // 배치된 카드 — position 이 곧 슬롯 번호다
-    const placed = await query<{
-      binder_id: number;
-      position: number;
-      name: string;
-      local_id: string;
-      rarity: string | null;
-      image_base: string | null;
-    }>(
-      `SELECT bc.binder_id, bc.position,
-              c.name, c.local_id, c.rarity, c.image_base
-       FROM binder_cards bc
-       JOIN binders b ON b.id = bc.binder_id
-       JOIN cards c ON c.id = bc.card_id
-       WHERE b.user_id = $1
-       ORDER BY bc.position`,
+      `SELECT b.id, b.name, b.grid_rows, b.grid_cols, b.page_count,
+              COUNT(bc.id) AS placed,
+              cs.logo_url AS cover_logo
+         FROM binders b
+         LEFT JOIN binder_cards bc ON bc.binder_id = b.id
+         LEFT JOIN sets cs ON cs.id = b.cover_set_id
+        WHERE b.user_id = $1
+        GROUP BY b.id, cs.logo_url
+        ORDER BY b.created_at`,
       [DEMO_USER_ID],
     );
 
     binders = rows.map((b) => ({
-      ...b,
-      cards: placed
-        .filter((c) => c.binder_id === b.id)
-        .map((c) => ({
-          position: c.position,
-          name: c.name,
-          localId: c.local_id,
-          rarity: c.rarity,
-          imageBase: c.image_base,
-        })),
+      id: b.id,
+      name: b.name,
+      rows: b.grid_rows,
+      cols: b.grid_cols,
+      pageCount: b.page_count,
+      placed: Number(b.placed),
+      coverLogo: b.cover_logo,
     }));
 
-    // 보관함 — 아직 어느 바인더에도 놓이지 않은 카드
-    const st = await query<{
-      id: number;
-      name: string;
-      local_id: string;
-      rarity: string | null;
-      category: string;
-      types: string[] | null;
-      image_base: string | null;
-      set_name: string;
-    }>(
-      `SELECT st.id, c.name, c.local_id, c.rarity, c.category, c.types,
-              c.image_base, s.name AS set_name
-       FROM card_storage st
-       JOIN cards c ON c.id = st.card_id
-       JOIN sets  s ON s.id = c.set_id
-       WHERE st.user_id = $1
-       ORDER BY s.name, LPAD(regexp_replace(c.local_id, '\\D', '', 'g'), 6, '0'), c.local_id`,
-      [DEMO_USER_ID],
+    const [base] = await query<{ logo_url: string | null }>(
+      `SELECT logo_url FROM sets WHERE external_id = $1 AND logo_url IS NOT NULL LIMIT 1`,
+      [DEFAULT_COVER_SET],
     );
-    storage = st.map((r) => ({
-      id: r.id,
-      name: r.name,
-      localId: r.local_id,
-      rarity: r.rarity,
-      category: r.category,
-      types: r.types,
-      imageBase: r.image_base,
-      setName: r.set_name,
-    }));
+    defaultCover = base?.logo_url ?? null;
   } catch (e) {
     console.error("binders load failed:", (e as Error).message);
     dbError = true;
@@ -101,5 +63,5 @@ export default async function BindersPage() {
     );
   }
 
-  return <BinderManager initial={binders} storage={storage} />;
+  return <BinderList binders={binders} defaultCover={defaultCover} />;
 }
