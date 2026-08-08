@@ -9,19 +9,29 @@ import {
   dexHref,
   isCategory,
   isLang,
+  ENERGY_LABEL,
+  ENERGY_TYPES,
+  FALLBACK_TYPE,
   PAGE_SIZE,
   PICK_KEY,
+  TRAINER_LABEL,
+  TRAINER_TYPES,
   type CategoryId,
   type LangValue,
 } from "@/lib/dex";
 import {
   cardsByArtist,
   cardsInSet,
+  cardsOfEnergyType,
   cardsOfSpecies,
+  cardsOfTrainerType,
+  cardsWithoutDex,
   favoritedIds,
   listArtists,
+  listEnergyTypes,
   listSets,
   listSpecies,
+  listTrainerTypes,
   setDetail,
   speciesName,
   type CardRow,
@@ -149,6 +159,14 @@ export default async function DexPage({
         pick ? <SpeciesCards dex={pick} lang={lang} q={q} page={page} nav={nav} /> : <SpeciesList lang={lang} q={q} />
       ) : cat === "artist" ? (
         pick ? <ArtistCards artist={pick} lang={lang} q={q} page={page} nav={nav} /> : <ArtistList lang={lang} q={q} />
+      ) : cat === "trainer" ? (
+        pick ? <TypeCards kind="trainer" type={pick} lang={lang} q={q} page={page} nav={nav} />
+             : <TypeList kind="trainer" lang={lang} />
+      ) : cat === "energy" ? (
+        pick ? <TypeCards kind="energy" type={pick} lang={lang} q={q} page={page} nav={nav} />
+             : <TypeList kind="energy" lang={lang} />
+      ) : cat === "etc" ? (
+        <EtcCards lang={lang} q={q} page={page} nav={nav} />
       ) : (
         <NotReady label={active!.label} />
       )}
@@ -167,18 +185,17 @@ async function CategoryChooser({ lang }: { lang: LangValue }) {
       <div className="cat-grid">
         {CATEGORIES.map((c) => {
           const n = counts[c.id];
-          const href = c.ready ? dexHref({ lang, cat: c.id }) : c.interimHref;
+          const href = c.ready ? dexHref({ lang, cat: c.id }) : null;
           const body = (
             <>
               <span className="cat-name">
                 {c.label}
                 {c.temporary && <span className="cat-tag">임시</span>}
-                {!c.ready && c.interimHref && <span className="cat-tag">기존 화면</span>}
               </span>
               <span className="cat-desc">{c.desc}</span>
               <span className="cat-foot">
                 {n === null ? "—" : <span className="n-md">{n.toLocaleString()}</span>}
-                {!c.ready && !c.interimHref && <span className="cat-soon">준비 중</span>}
+                {!c.ready && <span className="cat-soon">준비 중</span>}
               </span>
             </>
           );
@@ -293,6 +310,49 @@ async function ArtistList({ lang, q }: { lang: LangValue; q: string }) {
   );
 }
 
+/** 트레이너·에너지의 하위 타입 목록. 개수순이 아니라 정해진 순서로 보여준다. */
+async function TypeList({ kind, lang }: { kind: "trainer" | "energy"; lang: LangValue }) {
+  const known = kind === "trainer" ? TRAINER_TYPES : ENERGY_TYPES;
+  const label = kind === "trainer" ? TRAINER_LABEL : ENERGY_LABEL;
+  const fallback = FALLBACK_TYPE[kind];
+
+  const rows = kind === "trainer"
+    ? await listTrainerTypes(known, lang)
+    : await listEnergyTypes(known, lang);
+
+  const byType = new Map(rows.map((r) => [r.type, r.cards]));
+  const order = [...known, fallback];
+  const shown = order.filter((t) => (byType.get(t) ?? 0) > 0);
+
+  if (shown.length === 0) return <NoMatch q="" what="카드" />;
+
+  return (
+    <>
+      <ListHead n={shown.length} unit="종류" q="" />
+      <div className="cat-grid">
+        {shown.map((t) => (
+          <Link key={t} href={dexHref({ lang, cat: kind, pick: t })} className="cat-tile">
+            <span className="cat-name">
+              {label[t] ?? t}
+              {t === fallback && <span className="cat-tag">구분 없음</span>}
+            </span>
+            <span className="cat-desc">
+              {t === "classic"
+                ? "2003년 이전 카드. 당시엔 서포트·아이템 구분이 없었습니다."
+                : t === "other"
+                  ? "타입 정보가 없는 카드입니다."
+                  : ""}
+            </span>
+            <span className="cat-foot">
+              <span className="n-md">{(byType.get(t) ?? 0).toLocaleString()}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </>
+  );
+}
+
 /* ── 3단: 카드 ────────────────────────────────────────────────────── */
 
 /** 페이지 링크를 만들 때 필요한 현재 위치 */
@@ -345,6 +405,46 @@ async function ArtistCards({
     <>
       <PickHead title={artist} sub="일러스트레이터" />
       <CardsView {...res} q={q} page={page} nav={nav} />
+    </>
+  );
+}
+
+async function TypeCards({
+  kind, type, lang, q, page, nav,
+}: { kind: "trainer" | "energy"; type: string; lang: LangValue; q: string; page: number; nav: Nav }) {
+  const known = kind === "trainer" ? TRAINER_TYPES : ENERGY_TYPES;
+  const label = kind === "trainer" ? TRAINER_LABEL : ENERGY_LABEL;
+  const res = kind === "trainer"
+    ? await cardsOfTrainerType(known, type, lang, q, page, PAGE_SIZE)
+    : await cardsOfEnergyType(known, type, lang, q, page, PAGE_SIZE);
+
+  return (
+    <>
+      <PickHead
+        title={label[type] ?? type}
+        sub={kind === "trainer" ? "트레이너" : "에너지"}
+      />
+      <CardsView {...res} q={q} page={page} nav={nav} />
+    </>
+  );
+}
+
+async function EtcCards({
+  lang, q, page, nav,
+}: { lang: LangValue; q: string; page: number; nav: Nav }) {
+  const res = await cardsWithoutDex(lang, q, page, PAGE_SIZE);
+  return (
+    <>
+      <p className="dex-hint">
+        포켓몬 카드인데 도감번호가 비어 있는 카드입니다. 라벨링이 끝나면 이 분류는 사라집니다.
+      </p>
+      <CardsView
+        {...res}
+        q={q}
+        page={page}
+        nav={nav}
+        emptyHint="분류되지 않은 카드가 없습니다."
+      />
     </>
   );
 }

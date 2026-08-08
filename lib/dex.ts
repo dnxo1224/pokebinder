@@ -36,11 +36,6 @@ export interface Category {
   desc: string;
   /** 아직 화면이 없는 대분류는 준비 중으로 표시한다 */
   ready: boolean;
-  /**
-   * 도감으로 옮기기 전까지 임시로 연결할 기존 화면.
-   * 재편 도중에도 기능이 끊기지 않게 하는 다리다. 옮기고 나면 제거한다.
-   */
-  interimHref?: string;
   /** 임시 분류(라벨링 후 소멸) */
   temporary?: boolean;
 }
@@ -54,9 +49,9 @@ export const CATEGORIES: Category[] = [
   { id: "set", label: "카드 세트", desc: "발매 세트별로 카드를 훑어봅니다.", ready: true },
   { id: "dex", label: "포켓몬 도감번호", desc: "포켓몬 종별로 카드를 모아 봅니다.", ready: true },
   { id: "artist", label: "아티스트", desc: "카드를 그린 일러스트레이터로 찾습니다.", ready: true },
-  { id: "trainer", label: "트레이너", desc: "서포트·아이템·스타디움·도구.", ready: false },
-  { id: "energy", label: "에너지", desc: "기본 에너지와 특수 에너지.", ready: false },
-  { id: "etc", label: "etc", desc: "아직 분류되지 않은 카드입니다.", ready: false, temporary: true },
+  { id: "trainer", label: "트레이너", desc: "서포트·아이템·도구·스타디움.", ready: true },
+  { id: "energy", label: "에너지", desc: "기본 에너지와 특수 에너지.", ready: true },
+  { id: "etc", label: "etc", desc: "아직 분류되지 않은 카드입니다.", ready: true, temporary: true },
 ];
 
 export function isCategory(v: string | undefined): v is CategoryId {
@@ -71,7 +66,37 @@ export const PICK_KEY: Partial<Record<CategoryId, string>> = {
   set: "set",
   dex: "dex",
   artist: "artist",
+  trainer: "type",
+  energy: "type",
 };
+
+/**
+ * 트레이너 하위 타입. 순서에 의미가 있어 개수순이 아니라 이 순서로 보여준다.
+ *
+ * '클래식'은 trainer_type 이 NULL 인 카드다. Item/Supporter/Stadium 구분이
+ * EX 시대(2003+)에 생긴 개념이라 그 전 카드에는 존재하지 않는다 — 결손이 아니다.
+ * 특정 시대에만 쓰인 희귀 타입(Rocket's Secret Machine 5장, Technical Machine 4장)도
+ * 별도 묶음으로 노출하지 않고 여기 접는다. (ADR-0001)
+ */
+export const TRAINER_TYPES = ["Supporter", "Item", "Tool", "Stadium"] as const;
+export const TRAINER_LABEL: Record<string, string> = {
+  Supporter: "서포트",
+  Item: "아이템",
+  Tool: "도구",
+  Stadium: "스타디움",
+  classic: "클래식",
+};
+
+/** 에너지 하위 타입. energy_type 이 없는 카드는 '기타'로 접는다. */
+export const ENERGY_TYPES = ["Normal", "Special"] as const;
+export const ENERGY_LABEL: Record<string, string> = {
+  Normal: "기본 에너지",
+  Special: "특수 에너지",
+  other: "기타",
+};
+
+/** 위 두 목록에 없는 값을 모으는 자리 */
+export const FALLBACK_TYPE = { trainer: "classic", energy: "other" } as const;
 
 /**
  * 카드 그리드 한 쪽에 담는 장수.

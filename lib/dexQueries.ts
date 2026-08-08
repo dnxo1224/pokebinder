@@ -210,6 +210,111 @@ export async function cardsByArtist(
   );
 }
 
+// ── 트레이너 / 에너지 ────────────────────────────────────────────────
+// 하위 타입은 목록에 없는 값을 전부 폴백 자리로 접는다.
+// (트레이너의 희귀 2종·구형 NULL → 'classic', 에너지의 NULL → 'other')
+
+export interface TypeRow {
+  type: string;
+  cards: number;
+}
+
+/** 정해진 타입 목록 안이면 그대로, 아니면 폴백으로 접는 SQL 식. */
+function bucketExpr(column: string, known: readonly string[], fallback: string): string {
+  const list = known.map((t) => `'${t}'`).join(",");
+  return `CASE WHEN ${column} IN (${list}) THEN ${column} ELSE '${fallback}' END`;
+}
+
+async function listTypes(
+  category: "Trainer" | "Energy",
+  column: "trainer_type" | "energy_type",
+  known: readonly string[],
+  fallback: string,
+  lang: LangValue,
+): Promise<TypeRow[]> {
+  const rows = await query<{ type: string; cards: string }>(
+    `SELECT ${bucketExpr(column, known, fallback)} AS type, count(*) AS cards
+       FROM cards
+      WHERE category = $1 AND ($2 OR lang = $3)
+      GROUP BY 1`,
+    [category, langArg(lang), lang],
+  );
+  // 정렬은 호출부가 정한 순서를 따르므로 여기서는 map 만 만든다
+  return rows.map((r) => ({ ...r, cards: Number(r.cards) }));
+}
+
+export const listTrainerTypes = (known: readonly string[], lang: LangValue) =>
+  listTypes("Trainer", "trainer_type", known, "classic", lang);
+
+export const listEnergyTypes = (known: readonly string[], lang: LangValue) =>
+  listTypes("Energy", "energy_type", known, "other", lang);
+
+async function cardsOfType(
+  category: "Trainer" | "Energy",
+  column: "trainer_type" | "energy_type",
+  known: readonly string[],
+  fallback: string,
+  type: string,
+  lang: LangValue,
+  q: string,
+  page: number,
+  size: number,
+): Promise<CardPage> {
+  // 폴백 자리는 '목록에 없는 값 전부'라서 조건이 반대가 된다
+  const list = known.map((t) => `'${t}'`).join(",");
+  const cond =
+    type === fallback
+      ? `(c.${column} IS NULL OR c.${column} NOT IN (${list}))`
+      : `c.${column} = $6`;
+
+  return toPage(
+    await query<CardRowWithTotal>(
+      `SELECT ${CARD_COLS}
+         FROM cards c JOIN sets s ON s.id = c.set_id
+        WHERE c.category = $1
+          AND ($2 OR c.lang = $3)
+          AND ($4::text IS NULL OR c.name ILIKE $4 OR c.illustrator ILIKE $4)
+          AND ${cond}
+        ORDER BY s.release_date DESC NULLS LAST, c.local_id
+        LIMIT $5 OFFSET ${type === fallback ? "$6" : "$7"}`,
+      type === fallback
+        ? [category, langArg(lang), lang, like(q), size, offset(page, size)]
+        : [category, langArg(lang), lang, like(q), size, type, offset(page, size)],
+    ),
+  );
+}
+
+export const cardsOfTrainerType = (
+  known: readonly string[], type: string, lang: LangValue, q: string, page: number, size: number,
+) => cardsOfType("Trainer", "trainer_type", known, "classic", type, lang, q, page, size);
+
+export const cardsOfEnergyType = (
+  known: readonly string[], type: string, lang: LangValue, q: string, page: number, size: number,
+) => cardsOfType("Energy", "energy_type", known, "other", type, lang, q, page, size);
+
+// ── etc — 포켓몬인데 도감번호가 없는 카드 ────────────────────────────
+// 수작업 라벨링(manual_dex_ids)이 끝나면 사라질 임시 분류다. (ADR-0001)
+export async function cardsWithoutDex(
+  lang: LangValue,
+  q: string,
+  page: number,
+  size: number,
+): Promise<CardPage> {
+  return toPage(
+    await query<CardRowWithTotal>(
+      `SELECT ${CARD_COLS}
+         FROM cards c JOIN sets s ON s.id = c.set_id
+        WHERE c.category = 'Pokemon'
+          AND ($1 OR c.lang = $2)
+          AND array_length(COALESCE(c.manual_dex_ids, c.dex_ids), 1) IS NULL
+          AND ($3::text IS NULL OR c.name ILIKE $3 OR c.illustrator ILIKE $3)
+        ORDER BY s.release_date DESC NULLS LAST, c.local_id
+        LIMIT $4 OFFSET $5`,
+      [langArg(lang), lang, like(q), size, offset(page, size)],
+    ),
+  );
+}
+
 // ── 즐겨찾기 표시용 ──────────────────────────────────────────────────
 /** 주어진 카드들 중 이미 찜한 것의 id 집합. 타일마다 조회하지 않으려고 한 번에 받는다. */
 export async function favoritedIds(userId: number, cardIds: number[]): Promise<Set<number>> {
